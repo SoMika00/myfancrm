@@ -23,7 +23,7 @@ from app.db import (
     update_conversation_state,
     upsert_subscriber,
 )
-from app.sinhome_client import SinhomeClientError, personality_chat, script_chat, script_media
+from app.sinhome_client import SinhomeClientError, personality_chat, script_chat, script_media, unpersona_chat
 
 st.set_page_config(page_title="Conversations Abonnés", layout="wide")
 
@@ -88,7 +88,11 @@ conv_row = None
 from app.db import get_conversation
 conv_row = get_conversation(conversation_id)
 
-active_mode = "Free Talking" if (conv_row and conv_row["mode"] == "free") else "Script Mode"
+active_mode = (
+    "Free Talking"
+    if (conv_row and conv_row["mode"] == "free")
+    else ("Chloé" if (conv_row and conv_row["mode"] == "chloe") else "Script Mode")
+)
 active_script_id = int(conv_row["script_id"]) if (conv_row and conv_row["script_id"]) else None
 active_bot_id = int(conv_row["bot_id"]) if conv_row else None
 
@@ -104,8 +108,8 @@ with left:
 
     selected_mode = st.radio(
         "Mode",
-        options=["Free Talking", "Script Mode"],
-        index=(0 if active_mode == "Free Talking" else 1),
+        options=["Free Talking", "Script Mode", "Chloé"],
+        index=(0 if active_mode == "Free Talking" else (2 if active_mode == "Chloé" else 1)),
         horizontal=True,
     )
 
@@ -124,12 +128,15 @@ with left:
         disabled=(selected_mode != "Script Mode") or script_started,
     )
 
-    desired_mode = "free" if selected_mode == "Free Talking" else "script"
+    desired_mode = "free" if selected_mode == "Free Talking" else ("chloe" if selected_mode == "Chloé" else "script")
     desired_script_id = None
     if selected_mode == "Script Mode" and selected_script_label != "(Aucun)":
         desired_script_id = int(selected_script_label.split("-")[0].strip().lstrip("#"))
+    if selected_mode == "Chloé":
+        desired_script_id = None
 
-    if not script_started:
+    can_apply_change = (not script_started) or (desired_mode != "script")
+    if can_apply_change:
         if conv_row and (
             desired_mode != conv_row["mode"]
             or desired_script_id != (int(conv_row["script_id"]) if conv_row["script_id"] else None)
@@ -233,6 +240,9 @@ def _call_llm(user_msg: str) -> str:
     conv_row_live = _get_conversation(conversation_id)
     current_step_live = int(conv_row_live["current_step"]) if conv_row_live else 1
     paywall_unlocked_live = bool(int(conv_row_live["paywall_unlocked"])) if conv_row_live else False
+
+    if active_mode == "Chloé":
+        return unpersona_chat(api_url, session_id, user_msg, history, None)
 
     if active_mode == "Free Talking" or not active_script_id:
         return personality_chat(api_url, session_id, user_msg, history, persona_data)

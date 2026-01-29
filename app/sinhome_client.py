@@ -80,3 +80,21 @@ def script_media(
             "media": media,
         },
     )
+
+
+def unpersona_chat(
+    api_base_url: str,
+    session_id: Optional[str],
+    message: str,
+    history: List[Dict[str, Any]],
+    persona_data: Optional[Dict[str, Any]] = None,
+) -> str:
+    return _post(
+        f"{api_base_url.rstrip('/')}/unpersona_chat",
+        {
+            "session_id": session_id,
+            "message": message,
+            "history": history,
+            "persona_data": persona_data,
+        },
+    )
